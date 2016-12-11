@@ -237,6 +237,18 @@ function demAdmin {
 	esac
 }
 
+function superPams{
+	printLog "starting pam operation" $STATUSLOG
+	apt-get update -y --force-yes | tee -a $APTLOG
+	apt-get install libpam-cracklib -y --force-yes | tee -a $APTLOG
+	COMMONPASSRPL="password\trequisite\t\tpam_cracklib.so retry=3 minlen=8 difok=3 remember=5 minlen=8 ucredit=-1 lcredit=-1 dcredit=-1  ocredit=-1"
+	sudo sed -i s/"password\trequisite\t\t\tpam_cracklib.so .*"/"$COMMONPASSRPL"/ /etc/pam.d/common-password
+	sed -i s/"^PASS_MAX_DAYS\t.*"/"PASS_MAX_DAYS\t90"/ /etc/login.defs
+	sed -i s/"^PASS_MIN_DAYS\t.*"/"PASS_MIN_DAYS\t30"/ /etc/login.defs
+	sed -i s/"^PASS_WARN_AGE\t.*"/"PASS_WARN_AGE\t7"/ /etc/login.defs
+	echo "auth required pam_tally2.so deny=5 onerr=fail unlock_time=1800" >> /etc/pam.d/common-auth
+}
+
 function debugInfo {
 cat <<EOF
 DEBUG INFO
@@ -386,6 +398,9 @@ while true; do
 			;;
 		"8")
 			updateSys
+			;;
+		"9")
+			superPams
 			;;
 		"a")
 			echo ""
