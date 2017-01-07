@@ -1,5 +1,5 @@
 #!/bin/bash
-# Auto-sec script V0.4b5 -Now with passwording!
+# Auto-sec script V0.4b6 -Now with pams!
 
 #############Disclaimer###############
 # Please attribute if you copy, modify, or distribute
@@ -47,7 +47,7 @@ BADUSERFILE="tmp/badusers"
 BADADMINFILE="tmp/badadmins"
 
 ###########Core Function Block#############
-function printLog {
+printLog() {
 	MESSAGE="$1"
 	echo $MESSAGE
 	shift
@@ -56,7 +56,7 @@ function printLog {
 		shift
 	done
 }
-function logFile {
+logFile() {
 	MESSAGE="$1"
 	shift
 	while [ "$1" !=  "" ]; do 
@@ -66,7 +66,7 @@ function logFile {
 }
 
 ###############Function Block#############
-function userDump {
+userDump() {
 	# printLog "Reading user files" /etc/status.log /etc/user.log
 	# get actual users from passwd file
 	# first extract the username and UID
@@ -76,7 +76,7 @@ function userDump {
 	 # then get rid of the UID portion and put the users in a file
 	  cut -f 1 -d ':' > alluser.txt
 }
-function userMatch {
+userMatch() {
 	if [ -e "$BADUSERFILE" ]; then
 		rm $BADUSERFILE
 	fi
@@ -92,8 +92,8 @@ function userMatch {
 	done
 	printLog "user matching operation completed" "$STATUSLOG" "$USERLOG"
 }
-function adminChk {
-	if [ -e "$BADADMINFILE"]; then
+adminChk() {
+	if [ -e "$BADADMINFILE" ]; then
 		rm $BADADMINFILE
 	fi
 	printLog "Starting Admin check operation" "$STATUSLOG" "$USERLOG"
@@ -103,7 +103,7 @@ function adminChk {
 	CURSUDO=$(cat /etc/group | grep ^sudo | cut -f 4- -d ':')
 	#setup IFS to delimit based on commas
 	IFS=","
-	for TESTADMIN in "$CURSUDO"; do
+	for TESTADMIN in $CURSUDO; do
 		if ! grep -q "^"$TESTADMIN"$" $AUTH_ADMIN_FILE; then
 		printLog "Unauthorized admin found: $TESTADMIN" "$USERLOG"
 		echo $TESTADMIN >> $BADADMINFILE
@@ -113,37 +113,37 @@ function adminChk {
 	IFS=$IFSBAK
 	printLog "Admin check finished" "$STATUSLOG" "$USERLOG"
 }
-function autoPass {
+autoPass() {
 	printLog "Starting PassChange operation" "$STATUSLOG" "$PASSLOG"
 	cat alluser.txt | \
 	while read USERDUMP; do
-		if ! [ "$USERDUMP" == "$CUR_USER" ]; then
+		if [ ! "$USERDUMP" == "$CUR_USER" ]; then
 			printLog "Changing password for $USERDUMP to $PASSWORD" "$PASSLOG"
 			echo "$USERDUMP:$PASSWORD" | chpasswd #batch change the passwords
 		fi
 	done
 }
-function servRemove {
-	ps -ef | grep [v]sftpd
+servRemove() {
+	ps -ef | grep "[v]sftpd"
 	apt-get purge netcat -y
 	apt-get purge samba -y
 	apt-get purge vsftpd -y
 	apt-get autoremove -y
 }
-function firewall {
+firewall() {
 	apt-get install gufw -y
 	ufw enable
 }
-function updateSys {
+updateSys() {
 	sudo mv /etc/apt/sources.list /etc/apt/sources.list.bak
 	# Enable update sources in /etc/apt/sources.list
 	echo "deb http://security.ubuntu.com/ubuntu/ $UBUNTU-security main universe" >> /etc/apt/sources.list
 	echo "deb http://us.archive.ubuntu.com/ubuntu/ $UBUNTU-updates main universe" >> /etc/apt/sources.list
 	# TODO modify /etc/apt/apt.conf.d/10periodic and 50unattended-upgrades with the settings needed (1,1,0,1) (sed)
-	if [grep -q "APT::Periodic::Unattended-Upgrade.*" /etc/apt/apt.d.conf/10periodic]; then
+	if grep -q "APT::Periodic::Unattended-Upgrade.*" /etc/apt/apt.d.conf/10periodic; then
 		sed -i s/APT::Periodic::Unattended-Upgrade .*\;/APT::Periodic::Unattended-Upgrade "1"\;/ /etc/apt/apt.conf.d/10periodic
 	else
-		echo "APT::Periodic::Unattended-Upgrade "1"\;" >> /etc/apt/apt.comf.d/10periodic
+		echo 'APT::Periodic::Unattended-Upgrade "1";' >> /etc/apt/apt.comf.d/10periodic
 	fi
 	# enable noncritical update check
 	gsettings set com.ubuntu.update-notifier regular-auto-launch-interval 0
@@ -151,7 +151,7 @@ function updateSys {
 	  apt-get update >> log/updates.log
 	  apt-get dist-upgrade -y | tee -a log/updates.log
 }
-function delUsers {
+delUsers() {
 	echo "The following users will be PERMANENTLY DELETED:"
 	cat $BADUSERFILE
 	echo "Options: y=yes; n=no(default); s=Let me choose"
@@ -169,7 +169,7 @@ function delUsers {
 			done
 			;;
 		[Ss])
-			for $USERNM in $BADUSERFILE; do
+			for USERNM in $BADUSERFILE; do
 				echo "Do you want to delete user $USERNM?"
 				read -p "y=yes, n=no, a=all (Y/n/a): " ANSWER
 				case $ANSWER in
@@ -194,7 +194,7 @@ function delUsers {
 	esac
 }
 
-function demAdmin {
+demAdmin() {
 	echo: "The following admins will be have admin priviliges revoked:"
 	cat $BADADMINFILE
 	echo "Options: y=yes; n=no(default); s=Let me choose"
@@ -212,7 +212,7 @@ function demAdmin {
 			done
 			;;
 		[Ss])
-			for $USERNM in $BADUSERFILE; do
+			for USERNM in $BADUSERFILE; do
 				echo "Do you want to revoke admin priviliges from user $USERNM?"
 				read -p "y=yes, n=no, a=all (Y/n/a): " ANSWER
 				case $ANSWER in
@@ -237,19 +237,19 @@ function demAdmin {
 	esac
 }
 
-function superPams{
+superPams() {
 	printLog "starting pam operation" $STATUSLOG
 	apt-get update -y --force-yes | tee -a $APTLOG
 	apt-get install libpam-cracklib -y --force-yes | tee -a $APTLOG
 	COMMONPASSRPL="password\trequisite\t\tpam_cracklib.so retry=3 minlen=8 difok=3 remember=5 minlen=8 ucredit=-1 lcredit=-1 dcredit=-1  ocredit=-1"
-	sudo sed -i s/"password\trequisite\t\t\tpam_cracklib.so .*"/"$COMMONPASSRPL"/ /etc/pam.d/common-password
+	sudo sed -i s/"password\trequisite\t\t\tpam_cracklib.so .*"/$COMMONPASSRPL/ /etc/pam.d/common-password
 	sed -i s/"^PASS_MAX_DAYS\t.*"/"PASS_MAX_DAYS\t90"/ /etc/login.defs
 	sed -i s/"^PASS_MIN_DAYS\t.*"/"PASS_MIN_DAYS\t30"/ /etc/login.defs
 	sed -i s/"^PASS_WARN_AGE\t.*"/"PASS_WARN_AGE\t7"/ /etc/login.defs
 	echo "auth required pam_tally2.so deny=5 onerr=fail unlock_time=1800" >> /etc/pam.d/common-auth
 }
 
-function debugInfo {
+debugInfo() {
 cat <<EOF
 DEBUG INFO
 
@@ -264,14 +264,14 @@ $(cat alluser.txt)
 EOF
 }
 
-function cleanup {
+cleanup() {
 	printLog "Interupt recieved, exiting...." /"$STATUSLOG"
 	rm $BADUSERFILE
 	rm $BADADMINFILE
 	exit
 }
 
-function setupIntEnv { # setup initial environment
+setupIntEnv() { # setup initial environment
 	echo "Welcome to the SecScrypt utility!"
 	printf "Are you $USER? [Y/n]: " # test current user so we don't mess up its account
 	read ANSWER
@@ -310,7 +310,7 @@ function setupIntEnv { # setup initial environment
 	sleep 2s
 }
 
-function utilityMenu {
+utilityMenu() {
 	while true; do
 		echo "Sec Script $VERSION"
 		echo "UTILITY MENU:"
@@ -327,8 +327,8 @@ function utilityMenu {
 				;;
 			"2")
 				read -p "Enter process/file/deamon to find: " ANSWER
-				PROCLIST=ps -ef | grep $ANSWER | grep -v "grep"
-				if [! $PROCLIST]; then
+				PROCLIST=$(ps -ef | grep $ANSWER | grep -v "grep")
+				if [[ ! $PROCLIST ]]; then
 					echo "Process not found. Searching filesystem for match..."
 					updatedb
 					locate $ANSWER
