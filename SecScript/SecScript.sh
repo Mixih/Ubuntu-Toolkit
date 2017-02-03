@@ -271,6 +271,17 @@ cleanup() {
 	exit
 }
 
+userDirPerm() {
+	printLog "starting user chmod opertion" $STATUSLOG $USERLOG
+	for CURRUSER in $(ls /home); do
+		printLog "Enforcing ownership of directory $CURRUSER" $USERLOG
+		chown -R $CURRUSER $CURRUSER
+		printLog "Enforcing permission on directory $CURRUSER" $USERLOG
+		chmod -R 750 $CURRUSER
+	done
+	printLog "User chmod operation completed" $STATUSLOG $USERLOG
+}
+
 setupIntEnv() { # setup initial environment
 	echo "Welcome to the SecScrypt utility!"
 	printf "Are you $USER? [Y/n]: " # test current user so we don't mess up its account
@@ -368,6 +379,7 @@ while true; do
 	echo "7. Lost media file remover "
 	echo "8. Enable update sources and update system"
 	echo "9. PAM history setter"
+	echo "10. User directory permissions"
 	echo "a. About"
 	echo "u. Utility"
 	echo "q. Quit" 
@@ -401,6 +413,9 @@ while true; do
 			;;
 		"9")
 			superPams
+			;;
+		"10")
+			UserDirPerm
 			;;
 		"a")
 			echo ""
